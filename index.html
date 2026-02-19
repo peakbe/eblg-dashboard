@@ -19,20 +19,21 @@
     .flight-row { padding:4px 0; cursor:pointer; }
     .flight-row:hover { background:#f3f4f6; }
 
+    button.tag {
+      cursor:pointer;
+      border:none;
+      background:#e5e7eb;
+      padding:3px 8px;
+      border-radius:4px;
+      margin-right:4px;
+    }
+    button.tag:hover { background:#d1d5db; }
+
     /* Version mobile optimisée */
     @media (max-width: 768px) {
-      main {
-        display: flex;
-        flex-direction: column;
-      }
-      #sidebar {
-        border-right: none;
-        border-bottom: 1px solid #ddd;
-        max-height: 45vh;
-      }
-      #map {
-        height: 55vh;
-      }
+      main { display:flex; flex-direction:column; }
+      #sidebar { border-right:none; border-bottom:1px solid #ddd; max-height:45vh; }
+      #map { height:55vh; }
     }
   </style>
 </head>
@@ -64,6 +65,13 @@
 
     <div class="block">
       <h2>Vols confirmés (FIDS)</h2>
+
+      <div style="margin-bottom:6px;">
+        <button class="tag" onclick="setFilter('ALL')">ALL</button>
+        <button class="tag" onclick="setFilter('ARR')">ARR</button>
+        <button class="tag" onclick="setFilter('DEP')">DEP</button>
+      </div>
+
       <div id="flights-list" class="small">Chargement...</div>
     </div>
 
@@ -84,8 +92,6 @@
    CONFIG
 ---------------------------------------------------------- */
 const AVWX_API_KEY = "ersegQzkf2Dfal-o26B4b5uzMrXBeHK2jOpOaY7nffc";
-
-// Proxy Render
 const PROXY = "https://eblg-proxy.onrender.com/fids?url=";
 
 const URL_ARR = PROXY + encodeURIComponent("https://fids.liegeairport.com/api/flights/Arrivals");
@@ -95,6 +101,10 @@ const EBLG = { lat:50.6374, lon:5.4432, runways:[
   { name:"04", heading:40 },
   { name:"22", heading:220 }
 ]};
+
+let FLT_FILTER = "ALL";
+let lastHeading = null;
+let flightMarker = null;
 
 /* ----------------------------------------------------------
    SONOMÈTRES
@@ -137,7 +147,6 @@ const SONO_MARKERS = SONOS.map(s => ({
 }));
 
 let corridorLayer = null;
-let lastHeading = null;
 
 /* ----------------------------------------------------------
    UTILITAIRE TEMPS LOCAL
@@ -169,7 +178,7 @@ function updateMetarUI(m) {
 }
 
 /* ----------------------------------------------------------
-   FIDS (via proxy Render)
+   FIDS
 ---------------------------------------------------------- */
 async function fetchFIDS() {
   const [arr, dep] = await Promise.all([
@@ -183,38 +192,68 @@ async function fetchFIDS() {
   };
 }
 
+function setFilter(f) {
+  FLT_FILTER = f;
+  refresh();
+}
+
 function showFlightDetail(v) {
   const d = document.getElementById("flight-detail");
   d.innerHTML = `
-    <div><strong>Vol :</strong> ${v.flightPax} (${v.flightNumber})</div>
-    <div><strong>Direction :</strong> ${v.direction}</div>
-    <div><strong>Type :</strong> ${v.aircraftType}</div>
-    <div><strong>Origine :</strong> ${v.origin} (${v.originIcao})</div>
-    <div><strong>Destination :</strong> ${v.destination} (${v.destinationIcao})</div>
-    <div><strong>Stand :</strong> ${v.stand || "-"}</div>
-    <div><strong>Piste :</strong> ${v.runway || "-"}</div>
-    <div><strong>STD/STA :</strong> ${formatLocal(v.sTx)}</div>
-    <div><strong>ETD/ETA :</strong> ${formatLocal(v.eTx)}</div>
-    <div><strong>ATD/ATA :</strong> ${formatLocal(v.aTx)}</div>
-    <div><strong>Handler :</strong> ${v.handler || "-"}</div>
-    <div><strong>Opérateur :</strong> ${v.operator || "-"}</div>
+    <div><strong>${v.flightPax}</strong> – ${v.aircraftType}</div>
+    <div>${v.direction === "Arrivals" ? "Arrivée" : "Départ"}</div>
+    <div>${v.origin} → ${v.destination}</div>
+    <div>Piste : ${v.runway || "-"}</div>
+    <div>STD/STA : ${formatLocal(v.sTx)}</div>
+    <div>ETD/ETA : ${formatLocal(v.eTx)}</div>
+    <div>ATD/ATA : ${formatLocal(v.aTx)}</div>
+    <div>Stand : ${v.stand || "-"}</div>
+    <div>Opérateur : ${v.operator || "-"}</div>
   `;
+}
+
+function highlightFlightOnMap(v) {
+  if (!v) return;
+
+  // Approximation simple : position générique sur l'aéroport
+  const pos = [EBLG.lat + 0.005, EBLG.lon + 0.005];
+
+  if (flightMarker) map.removeLayer(flightMarker);
+
+  flightMarker = L.circleMarker(pos, {
+    radius: 10,
+    color: "#f59e0b",
+    fillColor: "#f59e0b",
+    fillOpacity: 0.9
+  }).addTo(map).bindPopup(`Vol ${v.flightPax}`);
+
+  map.setView(pos, 13);
 }
 
 function updateFlightsUI(f) {
   const el = document.getElementById("flights-list");
-  const all = [...f.arrivals, ...f.departures];
+  let all = [...f.arrivals, ...f.departures];
+
+  // Filtrage ARR / DEP
+  if (FLT_FILTER === "ARR") all = all.filter(v => v.direction === "Arrivals");
+  if (FLT_FILTER === "DEP") all = all.filter(v => v.direction === "Departures");
+
+  // Tri par heure locale
+  all.sort((a,b) => new Date(a.sTx) - new Date(b.sTx));
+
+  // Limiter aux 10 prochains vols
+  all = all.slice(0, 10);
 
   if (!all.length) {
-    el.textContent = "Aucun vol FIDS disponible.";
+    el.textContent = "Aucun vol disponible.";
     return;
   }
 
-  el.innerHTML = all.slice(0,50).map(v => `
+  el.innerHTML = all.map(v => `
     <div class="flight-row" data-id="${v.id}">
       ${v.direction === "Arrivals" ? "ARR" : "DEP"} 
       ${v.flightPax} (${v.aircraftType}) – RWY ${v.runway || "?"}<br>
-      STD/STA: ${formatLocal(v.sTx)} – ETD/ETA: ${formatLocal(v.eTx)} – ATD/ATA: ${formatLocal(v.aTx)}
+      ${formatLocal(v.sTx)} → ${formatLocal(v.eTx)}
     </div>
   `).join("");
 
@@ -223,6 +262,7 @@ function updateFlightsUI(f) {
       const id = row.getAttribute("data-id");
       const flight = all.find(v => v.id === id);
       if (flight) showFlightDetail(flight);
+      highlightFlightOnMap(flight);
     });
   });
 }
