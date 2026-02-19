@@ -5,6 +5,7 @@
   <title>EBLG – FIDS, METAR, sonomètres</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
   <style>
     body { margin:0; font-family:system-ui; display:flex; flex-direction:column; height:100vh; }
     header { padding:0.5rem 1rem; background:#111827; color:#f9fafb; display:flex; justify-content:space-between; }
@@ -29,7 +30,6 @@
     }
     button.tag:hover { background:#d1d5db; }
 
-    /* Version mobile optimisée */
     @media (max-width: 768px) {
       main { display:flex; flex-direction:column; }
       #sidebar { border-right:none; border-bottom:1px solid #ddd; max-height:45vh; }
@@ -41,7 +41,7 @@
 
 <header>
   <h1>EBLG – FIDS + METAR + Sonomètres</h1>
-  <div class="small">Version GitHub + Render</div>
+  <div class="small">GitHub Pages + Render + ADS‑B</div>
 </header>
 
 <main>
@@ -64,14 +64,17 @@
     </div>
 
     <div class="block">
-      <h2>Vols confirmés (FIDS)</h2>
+      <h2>Alertes</h2>
+      <div id="alerts" class="small">Aucune alerte.</div>
+    </div>
 
+    <div class="block">
+      <h2>Vols confirmés (FIDS)</h2>
       <div style="margin-bottom:6px;">
         <button class="tag" onclick="setFilter('ALL')">ALL</button>
         <button class="tag" onclick="setFilter('ARR')">ARR</button>
         <button class="tag" onclick="setFilter('DEP')">DEP</button>
       </div>
-
       <div id="flights-list" class="small">Chargement...</div>
     </div>
 
@@ -104,20 +107,21 @@ const EBLG = { lat:50.6374, lon:5.4432, runways:[
 
 let FLT_FILTER = "ALL";
 let lastHeading = null;
+let lastRunway = null;
 let flightMarker = null;
 
 /* ----------------------------------------------------------
-   SONOMÈTRES
+   SONOMÈTRES (coordonnées corrigées)
 ---------------------------------------------------------- */
 const SONOS = [
   { id:"F017", lat:50.764883, lon:5.630606 },
-  { id:"F001", lat:50.737, lon:5.608833 },
+  { id:"F001", lat:50.738044, lon:5.608833 },
   { id:"F014", lat:50.718894, lon:5.573164 },
   { id:"F015a", lat:50.688839, lon:5.526217 },
   { id:"F015b", lat:50.639331, lon:5.323519 },
-  { id:"F003", lat:50.601167, lon:5.3814 },
+  { id:"F003", lat:50.601167, lon:5.381400 },
   { id:"F011", lat:50.601142, lon:5.356006 },
-  { id:"F008", lat:50.594878, lon:5.35895 },
+  { id:"F008", lat:50.594878, lon:5.358950 },
   { id:"F002", lat:50.588414, lon:5.370522 },
   { id:"F007", lat:50.590756, lon:5.345225 },
   { id:"F009", lat:50.580831, lon:5.355417 },
@@ -143,10 +147,61 @@ const SONO_MARKERS = SONOS.map(s => ({
   ...s,
   marker: L.circleMarker([s.lat, s.lon], {
     radius:5, color:"#2563eb", fillColor:"#2563eb", fillOpacity:1
-  }).addTo(map).bindPopup(s.id)
+  }).addTo(map).bindTooltip(s.id, {permanent:true, direction:"top"})
 }));
 
 let corridorLayer = null;
+let heatLayer = null;
+
+/* ----------------------------------------------------------
+   ADS‑B
+---------------------------------------------------------- */
+let ADSB_MARKERS = {};
+let ADSB_TRACKS = {};
+
+async function fetchADSB() {
+  const url = "https://opensky-network.org/api/states/all?lamin=50.3&lomin=5.1&lamax=50.9&lomax=5.8";
+  try {
+    const r = await fetch(url);
+    const j = await r.json();
+    return j.states || [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function updateADSB(states) {
+  states.forEach(s => {
+    const icao = s[0];
+    const callsign = (s[1] || "").trim();
+    const lon = s[5];
+    const lat = s[6];
+
+    if (!lat || !lon) return;
+
+    if (!ADSB_MARKERS[icao]) {
+      ADSB_MARKERS[icao] = L.circleMarker([lat, lon], {
+        radius: 6,
+        color: "#f59e0b",
+        fillColor: "#f59e0b",
+        fillOpacity: 0.9
+      }).addTo(map).bindPopup(`ICAO: ${icao}<br>Callsign: ${callsign}`);
+    } else {
+      ADSB_MARKERS[icao].setLatLng([lat, lon]);
+    }
+
+    if (!ADSB_TRACKS[icao]) ADSB_TRACKS[icao] = [];
+    ADSB_TRACKS[icao].push([lat, lon]);
+    if (ADSB_TRACKS[icao].length > 40) ADSB_TRACKS[icao].shift();
+
+    if (ADSB_TRACKS[icao].poly) map.removeLayer(ADSB_TRACKS[icao].poly);
+
+    ADSB_TRACKS[icao].poly = L.polyline(ADSB_TRACKS[icao], {
+      color: "#fbbf24",
+      weight: 2
+    }).addTo(map);
+  });
+}
 
 /* ----------------------------------------------------------
    UTILITAIRE TEMPS LOCAL
@@ -173,7 +228,6 @@ async function fetchMetar() {
 function updateMetarUI(m) {
   document.getElementById("meteo-summary").textContent =
     `Vent ${m.wind_direction.value}° / ${m.wind_speed.value} kt – T° ${m.temperature.value}°C`;
-
   document.getElementById("meteo-raw").textContent = m.raw;
 }
 
@@ -214,16 +268,14 @@ function showFlightDetail(v) {
 
 function highlightFlightOnMap(v) {
   if (!v) return;
-
-  // Approximation simple : position générique sur l'aéroport
   const pos = [EBLG.lat + 0.005, EBLG.lon + 0.005];
 
   if (flightMarker) map.removeLayer(flightMarker);
 
   flightMarker = L.circleMarker(pos, {
     radius: 10,
-    color: "#f59e0b",
-    fillColor: "#f59e0b",
+    color: "#f97316",
+    fillColor: "#f97316",
     fillOpacity: 0.9
   }).addTo(map).bindPopup(`Vol ${v.flightPax}`);
 
@@ -234,14 +286,10 @@ function updateFlightsUI(f) {
   const el = document.getElementById("flights-list");
   let all = [...f.arrivals, ...f.departures];
 
-  // Filtrage ARR / DEP
   if (FLT_FILTER === "ARR") all = all.filter(v => v.direction === "Arrivals");
   if (FLT_FILTER === "DEP") all = all.filter(v => v.direction === "Departures");
 
-  // Tri par heure locale
   all.sort((a,b) => new Date(a.sTx) - new Date(b.sTx));
-
-  // Limiter aux 10 prochains vols
   all = all.slice(0, 10);
 
   if (!all.length) {
@@ -268,13 +316,12 @@ function updateFlightsUI(f) {
 }
 
 /* ----------------------------------------------------------
-   RUNWAY + COULOIR BRUIT
+   RUNWAY + COULOIR BRUIT + ALERTES + HEATMAP
 ---------------------------------------------------------- */
 function extractRunway(f) {
   const all = [...f.arrivals, ...f.departures];
   const r = all.find(v => v.runway);
   if (!r) return null;
-
   const name = r.runway.replace(/[^0-9]/g,"");
   return EBLG.runways.find(x => x.name === name) || null;
 }
@@ -282,7 +329,6 @@ function extractRunway(f) {
 function runwayFromMetar(m) {
   if (!m || !m.wind_direction || m.wind_direction.value == null) return null;
   const windDir = m.wind_direction.value;
-
   let best = null;
   let bestDiff = 999;
 
@@ -342,6 +388,45 @@ function computeImpacted(heading) {
   return impacted;
 }
 
+function updateHeatmap(impacted) {
+  const points = SONOS.map(s => {
+    const isImp = impacted.find(i => i.id === s.id);
+    return [s.lat, s.lon, isImp ? 1.5 : 0.3];
+  });
+
+  if (heatLayer) map.removeLayer(heatLayer);
+
+  heatLayer = L.heatLayer(points, {
+    radius: 40,
+    blur: 25,
+    maxZoom: 12
+  }).addTo(map);
+}
+
+function computeAlerts(metar, runway) {
+  const alerts = [];
+
+  if (metar.wind_speed.value > 25)
+    alerts.push("Vent fort (>25 kt)");
+
+  if (metar.wind_gust && metar.wind_gust.value > 35)
+    alerts.push("Rafales fortes (>35 kt)");
+
+  if (runway && metar.wind_direction && metar.wind_direction.value != null) {
+    const diff = Math.abs(metar.wind_direction.value - runway.heading);
+    if (diff > 150 && diff < 210)
+      alerts.push("Vent arrière sur la piste active");
+  }
+
+  if (lastRunway && runway && lastRunway !== runway.name)
+    alerts.push(`Changement de piste : ${lastRunway} → ${runway.name}`);
+
+  lastRunway = runway ? runway.name : null;
+
+  document.getElementById("alerts").innerHTML =
+    alerts.length ? alerts.map(a => `<div>⚠️ ${a}</div>`).join("") : "Aucune alerte.";
+}
+
 /* ----------------------------------------------------------
    MAIN
 ---------------------------------------------------------- */
@@ -358,30 +443,34 @@ async function refresh() {
 
   if (!rw) {
     document.getElementById("runway-info").textContent = "Piste non déterminée.";
-    return;
+  } else {
+    const source = rwFromFids ? "FIDS" : "METAR (vent)";
+    document.getElementById("runway-info").textContent =
+      `Piste ${rw.name} (cap ${rw.heading}°) – source : ${source}`;
+
+    if (lastHeading == null) lastHeading = rw.heading;
+    let current = lastHeading;
+    let target = rw.heading;
+    let step = (target - current) * 0.1;
+    lastHeading = current + step;
+
+    const impacted = computeImpacted(lastHeading);
+    updateHeatmap(impacted);
+
+    document.getElementById("sonos-impacted").innerHTML =
+      impacted.length
+        ? impacted.map(s => `<span class="tag impacted">${s.id}</span>`).join(" ")
+        : "Aucun sonomètre impacté.";
+
+    computeAlerts(metar, rw);
   }
 
-  const source = rwFromFids ? "FIDS" : "METAR (vent)";
-  document.getElementById("runway-info").textContent =
-    `Piste ${rw.name} (cap ${rw.heading}°) – source : ${source}`;
-
-  // Animation douce du couloir bruit
-  if (lastHeading == null) lastHeading = rw.heading;
-  let current = lastHeading;
-  let target = rw.heading;
-  let step = (target - current) * 0.1;
-  lastHeading = current + step;
-
-  const impacted = computeImpacted(lastHeading);
-
-  document.getElementById("sonos-impacted").innerHTML =
-    impacted.length
-      ? impacted.map(s => `<span class="tag impacted">${s.id}</span>`).join(" ")
-      : "Aucun sonomètre impacté.";
+  const adsb = await fetchADSB();
+  updateADSB(adsb);
 }
 
 refresh();
-setInterval(refresh, 60_000); // rafraîchissement toutes les 60 s
+setInterval(refresh, 60_000);
 </script>
 
 </body>
