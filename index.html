@@ -18,6 +18,21 @@
     .tag.impacted { background:#b91c1c; color:white; }
     .flight-row { padding:4px 0; cursor:pointer; }
     .flight-row:hover { background:#f3f4f6; }
+@media (max-width: 768px) {
+  main {
+    display: flex;
+    flex-direction: column;
+  }
+  #sidebar {
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+    max-height: 45vh;
+  }
+  #map {
+    height: 55vh;
+  }
+}
+
   </style>
 </head>
 <body>
@@ -261,5 +276,6 @@ refresh();
 
 </body>
 </html>
+
 
 
