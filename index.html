@@ -18,21 +18,22 @@
     .tag.impacted { background:#b91c1c; color:white; }
     .flight-row { padding:4px 0; cursor:pointer; }
     .flight-row:hover { background:#f3f4f6; }
-@media (max-width: 768px) {
-  main {
-    display: flex;
-    flex-direction: column;
-  }
-  #sidebar {
-    border-right: none;
-    border-bottom: 1px solid #ddd;
-    max-height: 45vh;
-  }
-  #map {
-    height: 55vh;
-  }
-}
 
+    /* Version mobile optimisée */
+    @media (max-width: 768px) {
+      main {
+        display: flex;
+        flex-direction: column;
+      }
+      #sidebar {
+        border-right: none;
+        border-bottom: 1px solid #ddd;
+        max-height: 45vh;
+      }
+      #map {
+        height: 55vh;
+      }
+    }
   </style>
 </head>
 <body>
@@ -66,6 +67,11 @@
       <div id="flights-list" class="small">Chargement...</div>
     </div>
 
+    <div class="block">
+      <h2>Détail du vol</h2>
+      <div id="flight-detail" class="small">Cliquez sur un vol pour voir le détail.</div>
+    </div>
+
   </section>
 
   <section id="map"></section>
@@ -77,11 +83,10 @@
 /* ----------------------------------------------------------
    CONFIG
 ---------------------------------------------------------- */
-const AVWX_API_KEY = "ersegQzkf2Dfal-o26B4b5uzMrXBeHK2jOpOaY7nffc"; // ← remplace ceci
+const AVWX_API_KEY = "ersegQzkf2Dfal-o26B4b5uzMrXBeHK2jOpOaY7nffc";
 
-// Ton proxy Render (ex: https://eblg-proxy.onrender.com)
+// Proxy Render
 const PROXY = "https://eblg-proxy.onrender.com/fids?url=";
-
 
 const URL_ARR = PROXY + encodeURIComponent("https://fids.liegeairport.com/api/flights/Arrivals");
 const URL_DEP = PROXY + encodeURIComponent("https://fids.liegeairport.com/api/flights/Departures");
@@ -132,6 +137,20 @@ const SONO_MARKERS = SONOS.map(s => ({
 }));
 
 let corridorLayer = null;
+let lastHeading = null;
+
+/* ----------------------------------------------------------
+   UTILITAIRE TEMPS LOCAL
+---------------------------------------------------------- */
+function formatLocal(t) {
+  if (!t) return "-";
+  return new Date(t).toLocaleTimeString("fr-BE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Brussels"
+  });
+}
 
 /* ----------------------------------------------------------
    METAR
@@ -150,7 +169,7 @@ function updateMetarUI(m) {
 }
 
 /* ----------------------------------------------------------
-   FIDS (via ton proxy Render)
+   FIDS (via proxy Render)
 ---------------------------------------------------------- */
 async function fetchFIDS() {
   const [arr, dep] = await Promise.all([
@@ -164,6 +183,24 @@ async function fetchFIDS() {
   };
 }
 
+function showFlightDetail(v) {
+  const d = document.getElementById("flight-detail");
+  d.innerHTML = `
+    <div><strong>Vol :</strong> ${v.flightPax} (${v.flightNumber})</div>
+    <div><strong>Direction :</strong> ${v.direction}</div>
+    <div><strong>Type :</strong> ${v.aircraftType}</div>
+    <div><strong>Origine :</strong> ${v.origin} (${v.originIcao})</div>
+    <div><strong>Destination :</strong> ${v.destination} (${v.destinationIcao})</div>
+    <div><strong>Stand :</strong> ${v.stand || "-"}</div>
+    <div><strong>Piste :</strong> ${v.runway || "-"}</div>
+    <div><strong>STD/STA :</strong> ${formatLocal(v.sTx)}</div>
+    <div><strong>ETD/ETA :</strong> ${formatLocal(v.eTx)}</div>
+    <div><strong>ATD/ATA :</strong> ${formatLocal(v.aTx)}</div>
+    <div><strong>Handler :</strong> ${v.handler || "-"}</div>
+    <div><strong>Opérateur :</strong> ${v.operator || "-"}</div>
+  `;
+}
+
 function updateFlightsUI(f) {
   const el = document.getElementById("flights-list");
   const all = [...f.arrivals, ...f.departures];
@@ -174,17 +211,20 @@ function updateFlightsUI(f) {
   }
 
   el.innerHTML = all.slice(0,50).map(v => `
-    <div class="flight-row">
+    <div class="flight-row" data-id="${v.id}">
       ${v.direction === "Arrivals" ? "ARR" : "DEP"} 
       ${v.flightPax} (${v.aircraftType}) – RWY ${v.runway || "?"}<br>
-      STD/STA: ${format(v.sTx)} – ETD/ETA: ${format(v.eTx)} – ATD/ATA: ${format(v.aTx)}
+      STD/STA: ${formatLocal(v.sTx)} – ETD/ETA: ${formatLocal(v.eTx)} – ATD/ATA: ${formatLocal(v.aTx)}
     </div>
   `).join("");
-}
 
-function format(t) {
-  if (!t) return "-";
-  return new Date(t).toISOString().substring(11,16);
+  el.querySelectorAll(".flight-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = row.getAttribute("data-id");
+      const flight = all.find(v => v.id === id);
+      if (flight) showFlightDetail(flight);
+    });
+  });
 }
 
 /* ----------------------------------------------------------
@@ -197,6 +237,27 @@ function extractRunway(f) {
 
   const name = r.runway.replace(/[^0-9]/g,"");
   return EBLG.runways.find(x => x.name === name) || null;
+}
+
+function runwayFromMetar(m) {
+  if (!m || !m.wind_direction || m.wind_direction.value == null) return null;
+  const windDir = m.wind_direction.value;
+
+  let best = null;
+  let bestDiff = 999;
+
+  EBLG.runways.forEach(rw => {
+    const diff = Math.min(
+      Math.abs(windDir - rw.heading),
+      360 - Math.abs(windDir - rw.heading)
+    );
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = rw;
+    }
+  });
+
+  return best;
 }
 
 function computePoint([lat,lon], heading, km) {
@@ -212,18 +273,14 @@ function computePoint([lat,lon], heading, km) {
   return [la2*180/Math.PI, lo2*180/Math.PI];
 }
 
-function offset([lat,lon], heading, km) {
-  return computePoint([lat,lon], heading, km);
-}
-
 function buildCorridor(heading) {
   const start = [EBLG.lat, EBLG.lon];
   const end = computePoint(start, heading, 20);
 
-  const leftStart = offset(start, heading - 90, 1.5);
-  const rightStart = offset(start, heading + 90, 1.5);
-  const leftEnd = offset(end, heading - 90, 3.5);
-  const rightEnd = offset(end, heading + 90, 3.5);
+  const leftStart = computePoint(start, heading - 90, 1.5);
+  const rightStart = computePoint(start, heading + 90, 1.5);
+  const leftEnd = computePoint(end, heading - 90, 3.5);
+  const rightEnd = computePoint(end, heading + 90, 3.5);
 
   return [leftStart, leftEnd, rightEnd, rightStart];
 }
@@ -255,15 +312,27 @@ async function refresh() {
   const fids = await fetchFIDS();
   updateFlightsUI(fids);
 
-  const rw = extractRunway(fids);
+  const rwFromFids = extractRunway(fids);
+  const rwFromMetar = runwayFromMetar(metar);
+  const rw = rwFromFids || rwFromMetar;
+
   if (!rw) {
     document.getElementById("runway-info").textContent = "Piste non déterminée.";
     return;
   }
 
-  document.getElementById("runway-info").textContent = `Piste ${rw.name} (cap ${rw.heading}°)`;
+  const source = rwFromFids ? "FIDS" : "METAR (vent)";
+  document.getElementById("runway-info").textContent =
+    `Piste ${rw.name} (cap ${rw.heading}°) – source : ${source}`;
 
-  const impacted = computeImpacted(rw.heading);
+  // Animation douce du couloir bruit
+  if (lastHeading == null) lastHeading = rw.heading;
+  let current = lastHeading;
+  let target = rw.heading;
+  let step = (target - current) * 0.1;
+  lastHeading = current + step;
+
+  const impacted = computeImpacted(lastHeading);
 
   document.getElementById("sonos-impacted").innerHTML =
     impacted.length
@@ -272,10 +341,8 @@ async function refresh() {
 }
 
 refresh();
+setInterval(refresh, 60_000); // rafraîchissement toutes les 60 s
 </script>
 
 </body>
 </html>
-
-
-
