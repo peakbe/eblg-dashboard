@@ -5,30 +5,18 @@
   <title>EBLG – FIDS, METAR, Bruit (Diapason), ADS‑B & Sonomètres</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Leaflet CSS -->
-  https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+ <!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Styles -->
-  <style>
-    body { margin:0; font-family:system-ui; display:flex; flex-direction:column; height:100vh; }
-    header { background:#111827; color:#f9fafb; padding:0.5rem 1rem; display:flex; justify-content:space-between;}
-    main { display:grid; grid-template-columns:320px 1fr; flex:1;}
-    #sidebar { padding:1rem; overflow-y:auto; border-right:1px solid #ddd; font-size:0.85rem;}
-    #map { width:100%; height:100%; }
-    .block { margin-bottom:1rem; border-bottom:1px solid #ddd; padding-bottom:1rem;}
-    .metar { background:#f3f4f6; padding:0.4rem; border-radius:4px; font-family:monospace;}
-    .small { font-size:0.75rem; color:#555;}
-    .tag { background:#eee; padding:2px 6px; border-radius:4px; font-size:0.7rem;}
-    .tag.impacted { background:#b91c1c; color:white;}
-    .flight-row { padding:4px 0; cursor:pointer;}
-    .flight-row:hover { background:#f3f4f6;}
-    button.tag { cursor:pointer; border:none; background:#e5e7eb; padding:3px 8px; border-radius:4px; margin-right:4px;}
-    button.tag:hover { background:#d1d5db;}
-    @media(max-width:768px){
-      main{display:flex; flex-direction:column;}
-      #sidebar{border-right:none; border-bottom:1px solid #ddd; max-height:45vh;}
-      #map{height:55vh;}
-    }
+<!-- Leaflet Heatmap -->
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- SignalR -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.0/signalr.min.js"></script>
   </style>
 
   <!-- Chart.js -->
@@ -532,3 +520,4 @@ setInterval(refresh,60_000);
 
 </body>
 </html>
+
