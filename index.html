@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>EBLG – FIDS, METAR, Bruit (Diapason), ADS‑B & Sonomètres</title>
+<title>EBLG – FIDS, METAR, Bruit (Diapason), ADS‑B && Sonomètres</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Leaflet CSS -->
@@ -54,7 +54,7 @@ main{display:flex; flex-direction:column;}
 </div>
 
 <div class="block">
-<h2>Piste & couloir bruit</h2>
+<h2>Piste && couloir bruit</h2>
 <div id="runway-info" class="small">Analyse...</div>
 </div>
 
@@ -119,7 +119,7 @@ let lastRunway = null;
 // -----------------------------
 function normalizeCallsign(cs) {
 if (!cs) return "";
-return String(cs).toUpperCase().trim().replace(/\s+/g,"").replace(/[^A-Z0-9]/g,"").slice(0,8);
+return String(cs).toUpperCase().trim().replace(/||s+/g,"").replace(/[^A-Z0-9]/g,"").slice(0,8);
 }
 let ADSB_BY_CALLSIGN = {}; // { norm: {icao, marker} }
 let LAST_FIDS = null;      // dernier fids affiché
@@ -183,7 +183,7 @@ let ADSB_MARKERS = {};
 let ADSB_TRACKS  = {};
 
 async function fetchADSB(){
-const url="https://opensky-network.org/api/states/all?lamin=50.3&lomin=5.1&lamax=50.9&lomax=5.8";
+const url="https://opensky-network.org/api/states/all?lamin=50.3&&lomin=5.1&&lamax=50.9&&lomax=5.8";
 try{
 const r = await fetch(url);
 const j = await r.json();
@@ -273,7 +273,7 @@ highlightFlightOnMap(v);
 METAR
 ================================ */
 async function fetchMetar(){
-const url = `https://avwx.rest/api/metar/EBLG?token=${AVWX_TOKEN}&format=json`;
+const url = `https://avwx.rest/api/metar/EBLG?token=${AVWX_TOKEN}&&format=json`;
 const r = await fetch(url);
 return r.json();
 }
@@ -632,7 +632,7 @@ let ADSB_MARKERS = {};
 let ADSB_TRACKS  = {};
 
 async function fetchADSB(){
-const url="https://opensky-network.org/api/states/all?lamin=50.3&lomin=5.1&lamax=50.9&lomax=5.8";
+const url="https://opensky-network.org/api/states/all?lamin=50.3&&lomin=5.1&&lamax=50.9&&lomax=5.8";
 try{
 const r = await fetch(url);
 const j = await r.json();
@@ -722,7 +722,7 @@ highlightFlightOnMap(v);
 METAR
 ================================ */
 async function fetchMetar(){
-const url = `https://avwx.rest/api/metar/EBLG?token=${AVWX_TOKEN}&format=json`;
+const url = `https://avwx.rest/api/metar/EBLG?token=${AVWX_TOKEN}&&format=json`;
 const r = await fetch(url);
 return r.json();
 }
@@ -1074,4 +1074,5 @@ setInterval(refresh,60_000);
 
 </body>
 </html>
+
 
