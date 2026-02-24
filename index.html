@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Leaflet CSS -->
-https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- Styles -->
 <style>
@@ -32,12 +32,12 @@ main{display:flex; flex-direction:column;}
 </style>
 
 <!-- Leaflet JS + Heatmap -->
-https://unpkg.com/leaflet@1.9.4/dist/leaflet.js</script>
-https://unpkg.com/leaflet.heat/dist/leaflet-heat.js</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 <!-- Chart.js -->
-https://cdn.jsdelivr.net/npm/chart.js</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- SignalR -->
-https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.0/signalr.min.js</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.0/signalr.min.js"></script>
 </head>
 <body>
 <header>
@@ -551,11 +551,11 @@ const diff=Math.abs(m.wind_direction.value - rw.heading);
 if (diff>150 && diff<210) a.push("Vent arrière");
 }
 if (lastRunway && rw && lastRunway!==rw.name)
-a. push(`Changement piste : ${lastRunway} → ${rw.name}`);
+a.push(`Changement piste : ${lastRunway} → ${rw.name}`);
 lastRunway=rw?rw.name:null;
 
 document.getElementById("alerts").innerHTML =
-a. length ? a.map(x=>`<div>⚠️ ${x}</div>`).join("") : "Aucune alerte.";
+a.lenght ? a.map(x=>`<div>⚠️ ${x}</div>`).join("") : "Aucune alerte.";
 }
 
 /* ================================
@@ -1000,7 +1000,7 @@ const diff=Math.abs(m.wind_direction.value - rw.heading);
 if (diff>150 && diff<210) a.push("Vent arrière");
 }
 if (lastRunway && rw && lastRunway!==rw.name)
-a. push(`Changement piste : ${lastRunway} → ${rw.name}`);
+a.push(`Changement piste : ${lastRunway} → ${rw.name}`);
 lastRunway=rw?rw.name:null;
 
 document.getElementById("alerts").innerHTML =
@@ -1074,3 +1074,4 @@ setInterval(refresh,60_000);
 
 </body>
 </html>
+
