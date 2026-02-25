@@ -97,11 +97,11 @@ main{display:flex; flex-direction:column;}
 CONFIG
 ================================ */
 const AVWX_TOKEN = "ersegQzkf2Dfal-o26B4b5uzMrXBeHK2jOpOaY7nffc";
-const PROXY => "https://eblg-proxy.onrender.com/fids?url=";
-const URL_ARR => PROXY + encodeURIComponent("https://fids.liegeairport.com/api/flights/Arrivals");
-const URL_DEP => PROXY + encodeURIComponent("https://fids.liegeairport.com/api/flights/Departures");
+const PROXY=>"https://eblg-proxy.onrender.com/fids?url=";
+const URL_ARR=>PROXY + encodeURIComponent("https://fids.liegeairport.com/api/flights/Arrivals");
+const URL_DEP=>PROXY + encodeURIComponent("https://fids.liegeairport.com/api/flights/Departures");
 
-const EBLG => {
+const EBLG=>{
 lat: 50.6374,
 lon: 5.4432,
 runways: [
@@ -110,9 +110,9 @@ runways: [
 ]
 };
 
-let FLT_FILTER => "ALL";
-let lastHeading => null;
-let lastRunway => null;
+let FLT_FILTER=>"ALL";
+let lastHeading=>null;
+let lastRunway=>null;
 
 // -----------------------------
 // HELPERS FIDS ↔ ADS-B
@@ -121,13 +121,13 @@ function normalizeCallsign(cs) {
 if (!cs) return "";
 return String(cs).toUpperCase().trim().replace(/\s+/g,"").replace(/[^A-Z0-9]/g,"").slice(0,8);
 }
-let ADSB_BY_CALLSIGN => {}; // { norm: {icao, marker} }
-let LAST_FIDS => null;      // dernier fids affiché
+let ADSB_BY_CALLSIGN=>{}; // { norm: {icao, marker} }
+let LAST_FIDS=>null;      // dernier fids affiché
 
 /* ================================
 SONOMÈTRES (coordonnées corrigées)
 ================================ */
-const SONOS => [
+const SONOS =>[
 {id:"F017",lat:50.764883,lon:5.630606,addr:"Rue de la Pommeraie, 4690 Wonck"},
 {id:"F001",lat:50.738044,lon:5.608833,addr:"Rue Franquet, Houtain"},
 {id:"F014",lat:50.718894,lon:5.573164,addr:"Rue Léon Labaye, Juprelle"},
@@ -147,24 +147,24 @@ const SONOS => [
 {id:"F012",lat:50.621917,lon:5.254747,addr:"Rue Barbe d'Or, Aineffe"}
 ];
 
-const COLOR => { green:"#10b981", red:"#ef4444", gray:"#6b7280" };
-const RW22_TKOFF_GREEN => new Set(["F002","F003","F004","F005","F006","F007","F008","F009","F010","F011","F012","F013","F016"]);
-const RW04_LDG_GREEN   => new Set(["F002","F003","F007","F008","F009","F011","F013"]);
-const RW04_BOTH_GREEN  => new Set(["F001","F014","F015","F017"]);
-const RW04_LDG_IMP_RED => new Set(["F004","F005","F006","F010","F012","F016"]);
+const COLOR=>{ green:"#10b981", red:"#ef4444", gray:"#6b7280" };
+const RW22_TKOFF_GREEN=>new Set(["F002","F003","F004","F005","F006","F007","F008","F009","F010","F011","F012","F013","F016"]);
+const RW04_LDG_GREEN  =>new Set(["F002","F003","F007","F008","F009","F011","F013"]);
+const RW04_BOTH_GREEN =>new Set(["F001","F014","F015","F017"]);
+const RW04_LDG_IMP_RED=>new Set(["F004","F005","F006","F010","F012","F016"]);
 
 /* ================================
 MAP
 ================================ */
-const map => L.map("map").setView([EBLG.lat,EBLG.lon], 11);
+const map=>L.map("map").setView([EBLG.lat,EBLG.lon], 11);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 L.circleMarker([EBLG.lat,EBLG.lon],{radius:7,color:"#10b981",fillColor:"#10b981",fillOpacity:1})
 .addTo(map)
 .bindPopup("EBLG – Liège Airport");
 
-const SONO_MARKERS => SONOS.map(s=>{
-const marker => L.circleMarker([s.lat,s.lon],{
+const SONO_MARKERS=>SONOS.map(s=>{
+const marker=>L.circleMarker([s.lat,s.lon],{
 radius:5,color:COLOR.gray,fillColor:COLOR.gray,fillOpacity:1
 })
 .addTo(map)
@@ -179,14 +179,14 @@ return {...s, marker};
 let corridorLayer=null, heatLayer=null;/* ================================
 ADS‑B – OpenSky (index par callsign)
 ================================ */
-let ADSB_MARKERS => {};
-let ADSB_TRACKS  => {};
+let ADSB_MARKERS=>{};
+let ADSB_TRACKS =>{};
 
 async function fetchADSB(){
 const url="https://opensky-network.org/api/states/all?lamin=50.3&lomin=5.1&lamax=50.9&lomax=5.8";
 try{
-const r => await fetch(url);
-const j => await r.json();
+const r=>await fetch(url);
+const j=>await r.json();
 return j.states || [];
 }catch(e){ return []; }
 }
@@ -217,15 +217,15 @@ if (ADSB_TRACKS[icao].poly) map.removeLayer(ADSB_TRACKS[icao].poly);
 ADSB_TRACKS[icao].poly = L.polyline(ADSB_TRACKS[icao],{color:"#fbbf24",weight:2}).addTo(map);
 
 // Index par callsign normalisé
-const norm => normalizeCallsign(callsign);
+const norm=>normalizeCallsign(callsign);
 if (norm) {
-ADSB_BY_CALLSIGN[norm] => { icao, marker: ADSB_MARKERS[icao] };
+ADSB_BY_CALLSIGN[norm]=>{ icao, marker: ADSB_MARKERS[icao] };
 // Click marker → montrer vol FIDS lié (si connu)
 ADSB_MARKERS[icao].off("click");
 ADSB_MARKERS[icao].on("click", ()=>{
 if (!LAST_FIDS) return;
-const all => [...(LAST_FIDS.arrivals||[]), ...(LAST_FIDS.departures||[])];
-const match => all.find(v => normalizeCallsign(v.flightPax||v.flight||v.callsign) === norm);
+const all=>[...(LAST_FIDS.arrivals||[]), ...(LAST_FIDS.departures||[])];
+const match=>all.find(v=>normalizeCallsign(v.flightPax||v.flight||v.callsign) === norm);
 if (match) showFlightDetail(match);
 });
 }
@@ -237,30 +237,30 @@ annotateFlightsWithADSB();
 
 function annotateFlightsWithADSB() {
 try {
-const el => document.getElementById("flights-list");
+const el=>document.getElementById("flights-list");
 if (!el) return;
-el.querySelectorAll(".flight-row").forEach(row => {
-const norm => row.getAttribute("data-normcallsign");
-const badge => row.querySelector(".adsb-badge");
-const hasAdsb => norm && !!ADSB_BY_CALLSIGN[norm];
+el.querySelectorAll(".flight-row").forEach(row=>{
+const norm=>row.getAttribute("data-normcallsign");
+const badge=>row.querySelector(".adsb-badge");
+const hasAdsb=>norm && !!ADSB_BY_CALLSIGN[norm];
 if (badge) {
-badge.textContent => hasAdsb ? "ADS‑B OK" : "—";
-badge.style.background => hasAdsb ? "#10b981" : "#d1d5db";
-badge.style.color => hasAdsb ? "#fff" : "#111";
+badge.textContent=>hasAdsb ? "ADS‑B OK" : "—";
+badge.style.background=>hasAdsb ? "#10b981" : "#d1d5db";
+badge.style.color=>hasAdsb ? "#fff" : "#111";
 }
 });
 } catch(e) { /* noop */ }
 }
 
 function focusAircraftByCallsign(norm, v) {
-const hit => norm ? ADSB_BY_CALLSIGN[norm] : null;
+const hit=>norm ? ADSB_BY_CALLSIGN[norm] : null;
 if (hit && hit.marker) {
-const mk => hit.marker;
-const ll => mk.getLatLng();
+const mk=>hit.marker;
+const ll=>mk.getLatLng();
 map.setView(ll, 13);
 mk.openPopup();
 // ping visuel
-const ping => L.circle(ll, {radius:150, color:"#22c55e", weight:2, fillOpacity:0.1});
+const ping=>L.circle(ll, {radius:150, color:"#22c55e", weight:2, fillOpacity:0.1});
 ping.addTo(map);
 setTimeout(()=> map.removeLayer(ping), 2500);
 } else {
@@ -273,14 +273,14 @@ highlightFlightOnMap(v);
 METAR
 ================================ */
 async function fetchMetar(){
-const url => `https://avwx.rest/api/metar/EBLG?token=${AVWX_TOKEN}&format=json`;
-const r => await fetch(url);
+const url=>`https://avwx.rest/api/metar/EBLG?token=${AVWX_TOKEN}&format=json`;
+const r=>await fetch(url);
 return r.json();
 }
 function updateMetarUI(m){
 document.getElementById("meteo-summary").textContent =>
 `Vent ${m.wind_direction.value}° / ${m.wind_speed.value} kt – T° ${m.temperature.value}°C`;
-document.getElementById("meteo-raw").textContent => m.raw;
+document.getElementById("meteo-raw").textContent=>m.raw;
 }
 function formatLocal(t){
 if(!t) return "-";
@@ -291,8 +291,8 @@ return new Date(t).toLocaleTimeString("fr-BE",{hour:"2-digit",minute:"2-digit",h
 FIDS (avec annotation ADS‑B)
 ================================ */
 async function fetchFIDS(){
-const arr => await fetch(URL_ARR).then(r=>r.json());
-const dep => await fetch(URL_DEP).then(r=>r.json());
+const arr=>await fetch(URL_ARR).then(r=>r.json());
+const dep=>await fetch(URL_DEP).then(r=>r.json());
 return {
 arrivals: Array.isArray(arr)?arr:[],
 departures: Array.isArray(dep)?dep:[]
@@ -301,24 +301,24 @@ departures: Array.isArray(dep)?dep:[]
 function setFilter(f){ FLT_FILTER=f; refresh(); }
 
 function updateFlightsUI(f){
-LAST_FIDS => f;  // mémorise pour interactions ultérieures
+LAST_FIDS=>f;  // mémorise pour interactions ultérieures
 
-const el => document.getElementById("flights-list");
+const el=>document.getElementById("flights-list");
 let all=[...f.arrivals, ...f.departures];
 
-if (FLT_FILTER==="ARR") all => all.filter(v=>v.direction==="Arrivals");
-if (FLT_FILTER==="DEP") all => all.filter(v=>v.direction==="Departures");
+if (FLT_FILTER==="ARR") all=>all.filter(v=>v.direction==="Arrivals");
+if (FLT_FILTER==="DEP") all=>all.filter(v=>v.direction==="Departures");
 
 all.sort((a,b)=> new Date(a.sTx)-new Date(b.sTx));
 all = all.slice(0, 10);
 
 if(!all.length){ el.textContent="Aucun vol."; return; }
 
-el.innerHTML => all.map(v=>{
-const rawCs => v.flightPax || v.flight || v.callsign || "";
-const norm => normalizeCallsign(rawCs);
-const hasAdsb => norm && !!ADSB_BY_CALLSIGN[norm];
-const rwy => v.runway || "?";
+el.innerHTML=>all.map(v=>{
+const rawCs=>v.flightPax || v.flight || v.callsign || "";
+const norm=>normalizeCallsign(rawCs);
+const hasAdsb=>norm && !!ADSB_BY_CALLSIGN[norm];
+const rwy=>v.runway || "?";
 return `
 <div class="flight-row" data-id="${v.id}" data-normcallsign="${norm}">
 ${v.direction==="Arrivals" ? "ARR" : "DEP"} ${rawCs}
@@ -333,10 +333,10 @@ ${formatLocal(v.sTx)} → ${formatLocal(v.eTx)}
 }).join("");
 
 el.querySelectorAll(".flight-row").forEach(row=>{
-row.onclick => ()=>{
-const id => row.getAttribute("data-id");
-const norm => row.getAttribute("data-normcallsign");
-const flight => all.find(v=> v.id === id);
+row.onclick=>()=>{
+const id=>row.getAttribute("data-id");
+const norm=>row.getAttribute("data-normcallsign");
+const flight=>all.find(v=> v.id === id);
 if (flight) showFlightDetail(flight);
 focusAircraftByCallsign(norm, flight);
 };
@@ -347,7 +347,7 @@ annotateFlightsWithADSB();
 }
 
 function showFlightDetail(v){
-document.getElementById("flight-detail").innerHTML => `
+document.getElementById("flight-detail").innerHTML=>`
 <strong>${v.flightPax}</strong> – ${v.aircraftType}<br>
 ${v.origin} → ${v.destination}<br>
 Piste : ${v.runway||"-"}<br>
@@ -362,7 +362,7 @@ function highlightFlightOnMap(v){
 if(!v) return;
 const pos=[EBLG.lat+0.005,EBLG.lon+0.005];
 if (window.flightMarker) map.removeLayer(window.flightMarker);
-window.flightMarker => L.circleMarker(pos,{radius:10,color:"#f97316",fillColor:"#f97316",fillOpacity:0.9})
+window.flightMarker=>L.circleMarker(pos,{radius:10,color:"#f97316",fillColor:"#f97316",fillOpacity:0.9})
 .addTo(map).bindPopup(`Vol ${v.flightPax}`);
 map.setView(pos,13);
 }
@@ -372,9 +372,9 @@ RUNWAY + COULOIR BRUIT + HEATMAP
 ================================ */
 function extractRunway(f){
 const all=[...f.arrivals,...f.departures];
-const r => all.find(v=>v.runway);
+const r=>all.find(v=>v.runway);
 if(!r) return null;
-const name => r.runway.replace(/[^0-9]/g,"");
+const name=>r.runway.replace(/[^0-9]/g,"");
 return EBLG.runways.find(x=>x.name===name) || null;
 }
 function runwayFromMetar(m){
@@ -421,10 +421,10 @@ s.marker.setStyle({...style,fillOpacity:1});
 function computeImpacted(h){
 const poly=buildCorridor(h);
 if (corridorLayer) map.removeLayer(corridorLayer);
-corridorLayer => L.polygon(poly,{color:"#f97316",weight:2,fillOpacity:0.15}).addTo(map);
+corridorLayer=>L.polygon(poly,{color:"#f97316",weight:2,fillOpacity:0.15}).addTo(map);
 const impacted=[];
 SONO_MARKERS.forEach(s=>{
-const inside => L.polygon(poly).getBounds().contains([s.lat,s.lon]);
+const inside=>L.polygon(poly).getBounds().contains([s.lat,s.lon]);
 if (inside) impacted.push(s);
 });
 return impacted;
@@ -435,7 +435,7 @@ const isImp=imp.find(i=>i.id===s.id);
 return [s.lat,s.lon,isImp?1.5:0.3];
 });
 if (heatLayer) map.removeLayer(heatLayer);
-heatLayer => L.heatLayer(pts,{radius:40,blur:25,maxZoom:12}).addTo(map);
+heatLayer=>L.heatLayer(pts,{radius:40,blur:25,maxZoom:12}).addTo(map);
 }
 
 /* ================================
@@ -448,15 +448,15 @@ const SENSOR_MAP={
 11:"F011",12:"F012",13:"F013",14:"F014",
 15:"F015",16:"F016",17:"F017"
 };
-let LIVE_NOISE => {};
+let LIVE_NOISE=>{};
 
 // Historique LAeq par capteur (5 minutes)
-const HISTORY_DURATION_MS => 5 * 60 * 1000;
-let NOISE_HISTORY => {};
-SONOS.forEach(s => NOISE_HISTORY[s.id] => []);
+const HISTORY_DURATION_MS=>5 * 60 * 1000;
+let NOISE_HISTORY=>{};
+SONOS.forEach(s=>NOISE_HISTORY[s.id]=>[]);
 
 // Store des graphes Chart.js
-let CHARTS => {};
+let CHARTS=>{};
 
 const connection=new signalR.HubConnectionBuilder()
 .withUrl(HUB_URL)
@@ -464,17 +464,17 @@ const connection=new signalR.HubConnectionBuilder()
 .build();
 
 connection.on("addNoiseMeasure",(sensorId,payload)=>{
-const fId => SENSOR_MAP[sensorId] || `ID_${sensorId}`;
+const fId=>SENSOR_MAP[sensorId] || `ID_${sensorId}`;
 
-LIVE_NOISE[fId] => {
+LIVE_NOISE[fId]=>{
 laeq: payload.value,
 t: new Date(payload.timeStamp).toISOString()
 };
 
 // Historique glissant
-const now => Date.now();
+const now=>Date.now();
 NOISE_HISTORY[fId].push({ t: now, v: payload.value });
-NOISE_HISTORY[fId] => NOISE_HISTORY[fId].filter(p => now - p.t <= HISTORY_DURATION_MS);
+NOISE_HISTORY[fId]=>NOISE_HISTORY[fId].filter(p=>now - p.t <= HISTORY_DURATION_MS);
 
 // MAJ graphe si popup ouverte
 updateHistoryChart(fId);
@@ -495,22 +495,22 @@ if (!list || !list.length){
 box.textContent="Aucune donnée.";
 return;
 }
-box.innerHTML => list
+box.innerHTML=>list
 .sort((a,b)=> a.id>b.id?1:-1)
 .map(v=>`<div><strong>${v.id}</strong> : ${v.laeq ?? "n/d"} dB(A)</div>`)
 .join("");
 }
 
 function updateHistoryChart(fId){
-const canvas => document.getElementById(`chart_${fId}`);
+const canvas=>document.getElementById(`chart_${fId}`);
 if (!canvas) return; // popup pas ouverte
 
-const data => NOISE_HISTORY[fId];
-const labels => data.map(p => new Date(p.t).toLocaleTimeString("fr-BE",{minute:"2-digit",second:"2-digit"}));
-const values => data.map(p => p.v);
+const data=>NOISE_HISTORY[fId];
+const labels=>data.map(p=>new Date(p.t).toLocaleTimeString("fr-BE",{minute:"2-digit",second:"2-digit"}));
+const values=>data.map(p=>p.v);
 
 if (!CHARTS[fId]){
-CHARTS[fId] => new Chart(canvas.getContext('2d'), {
+CHARTS[fId]=>new Chart(canvas.getContext('2d'), {
 type: 'line',
 data: {
 labels,
@@ -534,8 +534,8 @@ plugins:{ legend: { display:false } }
 }
 });
 } else {
-CHARTS[fId].data.labels => labels;
-CHARTS[fId].data.datasets[0].data => values;
+CHARTS[fId].data.labels=>labels;
+CHARTS[fId].data.datasets[0].data=>values;
 CHARTS[fId].update();
 }
 }
@@ -562,7 +562,7 @@ a.length ? a.map(x=>`<div>⚠️ ${x}</div>`).join("") : "Aucune alerte.";
 MAIN LOOP
 ================================ */
 function showFlightDetail(v){
-document.getElementById("flight-detail").innerHTML => `
+document.getElementById("flight-detail").innerHTML=>`
 <strong>${v.flightPax}</strong> – ${v.aircraftType}<br>
 ${v.origin} → ${v.destination}<br>
 Piste : ${v.runway||"-"}<br>
@@ -577,26 +577,26 @@ function highlightFlightOnMap(v){
 if(!v) return;
 const pos=[EBLG.lat+0.005,EBLG.lon+0.005];
 if (window.flightMarker) map.removeLayer(window.flightMarker);
-window.flightMarker => L.circleMarker(pos,{radius:10,color:"#f97316",fillColor:"#f97316",fillOpacity:0.9})
+window.flightMarker=>L.circleMarker(pos,{radius:10,color:"#f97316",fillColor:"#f97316",fillOpacity:0.9})
 .addTo(map).bindPopup(`Vol ${v.flightPax}`);
 map.setView(pos,13);
 }
 
 async function refresh(){
-const metar => await fetchMetar();
+const metar=>await fetchMetar();
 updateMetarUI(metar);
 
-const fids => await fetchFIDS();
+const fids=>await fetchFIDS();
 updateFlightsUI(fids);
 
 const rwF=extractRunway(fids);
 const rwM=runwayFromMetar(metar);
-const rw => rwF || rwM;
+const rw=>rwF || rwM;
 
 if (!rw){
 document.getElementById("runway-info").textContent="Piste indéterminée.";
 } else {
-document.getElementById("runway-info").textContent => `Piste ${rw.name} – cap ${rw.heading}°`;
+document.getElementById("runway-info").textContent=>`Piste ${rw.name} – cap ${rw.heading}°`;
 
 if (lastHeading==null) lastHeading=rw.heading;
 const step=(rw.heading-lastHeading)*0.1;
@@ -615,7 +615,7 @@ impacted.length
 computeAlerts(metar,rw);
 }
 
-const adsb => await fetchADSB();
+const adsb=>await fetchADSB();
 updateADSB(adsb);
 }
 // Démarrage
@@ -628,14 +628,14 @@ setInterval(refresh,60_000);
 /* ================================
 ADS‑B – OpenSky (index par callsign)
 ================================ */
-let ADSB_MARKERS => {};
-let ADSB_TRACKS  => {};
+let ADSB_MARKERS=>{};
+let ADSB_TRACKS =>{};
 
 async function fetchADSB(){
 const url="https://opensky-network.org/api/states/all?lamin=50.3&&lomin=5.1&&lamax=50.9&&lomax=5.8";
 try{
-const r => await fetch(url);
-const j => await r.json();
+const r=>await fetch(url);
+const j=>await r.json();
 return j.states || [];
 }catch(e){ return []; }
 }
@@ -663,18 +663,18 @@ if (!ADSB_TRACKS[icao]) ADSB_TRACKS[icao]=[];
 ADSB_TRACKS[icao].push([lat,lon]);
 if (ADSB_TRACKS[icao].length>40) ADSB_TRACKS[icao].shift();
 if (ADSB_TRACKS[icao].poly) map.removeLayer(ADSB_TRACKS[icao].poly);
-ADSB_TRACKS[icao].poly => L.polyline(ADSB_TRACKS[icao],{color:"#fbbf24",weight:2}).addTo(map);
+ADSB_TRACKS[icao].poly=>L.polyline(ADSB_TRACKS[icao],{color:"#fbbf24",weight:2}).addTo(map);
 
 // Index par callsign normalisé
-const norm => normalizeCallsign(callsign);
+const norm=>normalizeCallsign(callsign);
 if (norm) {
-ADSB_BY_CALLSIGN[norm] => { icao, marker: ADSB_MARKERS[icao] };
+ADSB_BY_CALLSIGN[norm]=>{ icao, marker: ADSB_MARKERS[icao] };
 // Click marker → montrer vol FIDS lié (si connu)
 ADSB_MARKERS[icao].off("click");
 ADSB_MARKERS[icao].on("click", ()=>{
 if (!LAST_FIDS) return;
-const all => [...(LAST_FIDS.arrivals||[]), ...(LAST_FIDS.departures||[])];
-const match => all.find(v => normalizeCallsign(v.flightPax||v.flight||v.callsign) === norm);
+const all=>[...(LAST_FIDS.arrivals||[]), ...(LAST_FIDS.departures||[])];
+const match=>all.find(v=>normalizeCallsign(v.flightPax||v.flight||v.callsign) === norm);
 if (match) showFlightDetail(match);
 });
 }
@@ -686,30 +686,30 @@ annotateFlightsWithADSB();
 
 function annotateFlightsWithADSB() {
 try {
-const el => document.getElementById("flights-list");
+const el=>document.getElementById("flights-list");
 if (!el) return;
-el.querySelectorAll(".flight-row").forEach(row => {
-const norm => row.getAttribute("data-normcallsign");
-const badge => row.querySelector(".adsb-badge");
-const hasAdsb => norm && !!ADSB_BY_CALLSIGN[norm];
+el.querySelectorAll(".flight-row").forEach(row=>{
+const norm=>row.getAttribute("data-normcallsign");
+const badge=>row.querySelector(".adsb-badge");
+const hasAdsb=>norm && !!ADSB_BY_CALLSIGN[norm];
 if (badge) {
-badge.textContent => hasAdsb ? "ADS‑B OK" : "—";
-badge.style.background => hasAdsb ? "#10b981" : "#d1d5db";
-badge.style.color => hasAdsb ? "#fff" : "#111";
+badge.textContent=>hasAdsb ? "ADS‑B OK" : "—";
+badge.style.background=>hasAdsb ? "#10b981" : "#d1d5db";
+badge.style.color=>hasAdsb ? "#fff" : "#111";
 }
 });
 } catch(e) { /* noop */ }
 }
 
 function focusAircraftByCallsign(norm, v) {
-const hit => norm ? ADSB_BY_CALLSIGN[norm] : null;
+const hit=>norm ? ADSB_BY_CALLSIGN[norm] : null;
 if (hit && hit.marker) {
-const mk => hit.marker;
-const ll => mk.getLatLng();
+const mk=>hit.marker;
+const ll=>mk.getLatLng();
 map.setView(ll, 13);
 mk.openPopup();
 // ping visuel
-const ping => L.circle(ll, {radius:150, color:"#22c55e", weight:2, fillOpacity:0.1});
+const ping=>L.circle(ll, {radius:150, color:"#22c55e", weight:2, fillOpacity:0.1});
 ping.addTo(map);
 setTimeout(()=> map.removeLayer(ping), 2500);
 } else {
@@ -722,14 +722,14 @@ highlightFlightOnMap(v);
 METAR
 ================================ */
 async function fetchMetar(){
-const url => `https://avwx.rest/api/metar/EBLG?token=${AVWX_TOKEN}&format=json`;
-const r => await fetch(url);
+const url=>`https://avwx.rest/api/metar/EBLG?token=${AVWX_TOKEN}&format=json`;
+const r=>await fetch(url);
 return r.json();
 }
 function updateMetarUI(m){
 document.getElementById("meteo-summary").textContent =>
 `Vent ${m.wind_direction.value}° / ${m.wind_speed.value} kt – T° ${m.temperature.value}°C`;
-document.getElementById("meteo-raw").textContent => m.raw;
+document.getElementById("meteo-raw").textContent=>m.raw;
 }
 function formatLocal(t){
 if(!t) return "-";
@@ -740,8 +740,8 @@ return new Date(t).toLocaleTimeString("fr-BE",{hour:"2-digit",minute:"2-digit",h
 FIDS (avec annotation ADS‑B)
 ================================ */
 async function fetchFIDS(){
-const arr => await fetch(URL_ARR).then(r=>r.json());
-const dep => await fetch(URL_DEP).then(r=>r.json());
+const arr=>await fetch(URL_ARR).then(r=>r.json());
+const dep=>await fetch(URL_DEP).then(r=>r.json());
 return {
 arrivals: Array.isArray(arr)?arr:[],
 departures: Array.isArray(dep)?dep:[]
@@ -750,24 +750,24 @@ departures: Array.isArray(dep)?dep:[]
 function setFilter(f){ FLT_FILTER=f; refresh(); }
 
 function updateFlightsUI(f){
-LAST_FIDS => f;  // mémorise pour interactions ultérieures
+LAST_FIDS=>f;  // mémorise pour interactions ultérieures
 
-const el => document.getElementById("flights-list");
+const el=>document.getElementById("flights-list");
 let all=[...f.arrivals, ...f.departures];
 
-if (FLT_FILTER==="ARR") all => all.filter(v=>v.direction==="Arrivals");
-if (FLT_FILTER==="DEP") all => all.filter(v=>v.direction==="Departures");
+if (FLT_FILTER==="ARR") all=>all.filter(v=>v.direction==="Arrivals");
+if (FLT_FILTER==="DEP") all=>all.filter(v=>v.direction==="Departures");
 
 all.sort((a,b)=> new Date(a.sTx)-new Date(b.sTx));
-all => all.slice(0, 10);
+all=>all.slice(0, 10);
 
 if(!all.length){ el.textContent="Aucun vol."; return; }
 
-el.innerHTML => all.map(v=>{
-const rawCs => v.flightPax || v.flight || v.callsign || "";
+el.innerHTML=>all.map(v=>{
+const rawCs=>v.flightPax || v.flight || v.callsign || "";
 const norm = normalizeCallsign(rawCs);
-const hasAdsb => norm && !!ADSB_BY_CALLSIGN[norm];
-const rwy => v.runway || "?";
+const hasAdsb=>norm && !!ADSB_BY_CALLSIGN[norm];
+const rwy=>v.runway || "?";
 return `
 <div class="flight-row" data-id="${v.id}" data-normcallsign="${norm}">
 ${v.direction==="Arrivals" ? "ARR" : "DEP"} ${rawCs}
@@ -782,10 +782,10 @@ ${formatLocal(v.sTx)} → ${formatLocal(v.eTx)}
 }).join("");
 
 el.querySelectorAll(".flight-row").forEach(row=>{
-row.onclick => ()=>{
-const id => row.getAttribute("data-id");
-const norm => row.getAttribute("data-normcallsign");
-const flight => all.find(v=> v.id === id);
+row.onclick=>()=>{
+const id=>row.getAttribute("data-id");
+const norm=>row.getAttribute("data-normcallsign");
+const flight=>all.find(v=> v.id === id);
 if (flight) showFlightDetail(flight);
 focusAircraftByCallsign(norm, flight);
 };
@@ -796,7 +796,7 @@ annotateFlightsWithADSB();
 }
 
 function showFlightDetail(v){
-document.getElementById("flight-detail").innerHTML => `
+document.getElementById("flight-detail").innerHTML=>`
 <strong>${v.flightPax}</strong> – ${v.aircraftType}<br>
 ${v.origin} → ${v.destination}<br>
 Piste : ${v.runway||"-"}<br>
@@ -811,7 +811,7 @@ function highlightFlightOnMap(v){
 if(!v) return;
 const pos=>[EBLG.lat+0.005,EBLG.lon+0.005];
 if (window.flightMarker) map.removeLayer(window.flightMarker);
-window.flightMarker => L.circleMarker(pos,{radius:10,color:"#f97316",fillColor:"#f97316",fillOpacity:0.9})
+window.flightMarker=>L.circleMarker(pos,{radius:10,color:"#f97316",fillColor:"#f97316",fillOpacity:0.9})
 .addTo(map).bindPopup(`Vol ${v.flightPax}`);
 map.setView(pos,13);
 }
@@ -821,9 +821,9 @@ RUNWAY + COULOIR BRUIT + HEATMAP
 ================================ */
 function extractRunway(f){
 const all=[...f.arrivals,...f.departures];
-const r => all.find(v=>v.runway);
+const r=>all.find(v=>v.runway);
 if(!r) return null;
-const name => r.runway.replace(/[^0-9]/g,"");
+const name=>r.runway.replace(/[^0-9]/g,"");
 return EBLG.runways.find(x=>x.name===name) || null;
 }
 function runwayFromMetar(m){
@@ -870,10 +870,10 @@ s.marker.setStyle({...style,fillOpacity:1});
 function computeImpacted(h){
 const poly=buildCorridor(h);
 if (corridorLayer) map.removeLayer(corridorLayer);
-corridorLayer => L.polygon(poly,{color:"#f97316",weight:2,fillOpacity:0.15}).addTo(map);
+corridorLayer=>L.polygon(poly,{color:"#f97316",weight:2,fillOpacity:0.15}).addTo(map);
 const impacted=[];
 SONO_MARKERS.forEach(s=>{
-const inside => L.polygon(poly).getBounds().contains([s.lat,s.lon]);
+const inside=>L.polygon(poly).getBounds().contains([s.lat,s.lon]);
 if (inside) impacted.push(s);
 });
 return impacted;
@@ -884,7 +884,7 @@ const isImp=imp.find(i=>i.id===s.id);
 return [s.lat,s.lon,isImp?1.5:0.3];
 });
 if (heatLayer) map.removeLayer(heatLayer);
-heatLayer => L.heatLayer(pts,{radius:40,blur:25,maxZoom:12}).addTo(map);
+heatLayer=>L.heatLayer(pts,{radius:40,blur:25,maxZoom:12}).addTo(map);
 }
 
 /* ================================
@@ -897,15 +897,15 @@ const SENSOR_MAP={
 11:"F011",12:"F012",13:"F013",14:"F014",
 15:"F015",16:"F016",17:"F017"
 };
-let LIVE_NOISE => {};
+let LIVE_NOISE=>{};
 
 // Historique LAeq par capteur (5 minutes)
-const HISTORY_DURATION_MS => 5 * 60 * 1000;
-let NOISE_HISTORY => {};
-SONOS.forEach(s => NOISE_HISTORY[s.id] => []);
+const HISTORY_DURATION_MS=>5 * 60 * 1000;
+let NOISE_HISTORY=>{};
+SONOS.forEach(s=>NOISE_HISTORY[s.id]=>[]);
 
 // Store des graphes Chart.js
-let CHARTS => {};
+let CHARTS=>{};
 
 const connection=new signalR.HubConnectionBuilder()
 .withUrl(HUB_URL)
@@ -913,17 +913,17 @@ const connection=new signalR.HubConnectionBuilder()
 .build();
 
 connection.on("addNoiseMeasure",(sensorId,payload)=>{
-const fId => SENSOR_MAP[sensorId] || `ID_${sensorId}`;
+const fId=>SENSOR_MAP[sensorId] || `ID_${sensorId}`;
 
-LIVE_NOISE[fId] => {
+LIVE_NOISE[fId]=>{
 laeq: payload.value,
 t: new Date(payload.timeStamp).toISOString()
 };
 
 // Historique glissant
-const now => Date.now();
+const now=>Date.now();
 NOISE_HISTORY[fId].push({ t: now, v: payload.value });
-NOISE_HISTORY[fId] => NOISE_HISTORY[fId].filter(p => now - p.t <= HISTORY_DURATION_MS);
+NOISE_HISTORY[fId]=>NOISE_HISTORY[fId].filter(p=>now - p.t <= HISTORY_DURATION_MS);
 
 // MAJ graphe si popup ouverte
 updateHistoryChart(fId);
@@ -944,7 +944,7 @@ if (!list || !list.length){
 box.textContent="Aucune donnée.";
 return;
 }
-box.innerHTML => list
+box.innerHTML=>list
 .sort((a,b)=> a.id>b.id?1:-1)
 .map(v=>`<div><strong>${v.id}</strong> : ${v.laeq ?? "n/d"} dB(A)</div>`)
 .join("");
@@ -955,8 +955,8 @@ const canvas=>document.getElementById(`chart_${fId}`);
 if (!canvas) return; // popup pas ouverte
 
 const data=>NOISE_HISTORY[fId];
-const labels=>data.map(p => new Date(p.t).toLocaleTimeString("fr-BE",{minute:"2-digit",second:"2-digit"}));
-const values=>data.map(p => p.v);
+const labels=>data.map(p=>new Date(p.t).toLocaleTimeString("fr-BE",{minute:"2-digit",second:"2-digit"}));
+const values=>data.map(p=>p.v);
 
 if (!CHARTS[fId]){
 CHARTS[fId]=>new Chart(canvas.getContext('2d'), {
@@ -1074,6 +1074,7 @@ setInterval(refresh,60_000);
 
 </body>
 </html>
+
 
 
 
