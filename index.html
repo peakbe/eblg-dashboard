@@ -195,7 +195,7 @@ function updateADSB(states){
     const icao=(s[0]);
     const callsign=(s[1]||"").trim();
     const lon=s[5], lat=s[6];
-    if (!lat || !lon) return;
+    if (lat == null || lon == null) return;
 
     // Création / mise à jour du marker
     if (!ADSB_MARKERS[icao]){
@@ -625,4 +625,5 @@ setInterval(refresh,60_000);
 
 </body>
 </html>
+
 
