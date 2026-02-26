@@ -405,16 +405,33 @@ function buildCorridor(h){
   return [leftStart,leftEnd,rightEnd,rightStart];
 }
 function colorSonoByRunway(rwy){
-  SONO_MARKERS.forEach(s=>{
-    let style={color:COLOR.gray,fillColor:COLOR.gray};
-    if (rwy==="22"){
-      if (RW22_TKOFF_GREEN.has(s.id)) style={color:COLOR.green,fillColor:COLOR.green};
-    } else if (rwy==="04"){
-      if (RW04_LDG_IMP_RED.has(s.id)) style={color:COLOR.red,fillColor:COLOR.red};
-      else if (RW04_LDG_GREEN.has(s.id) || RW04_BOTH_GREEN.has(s.id))
-        style={color:COLOR.green,fillColor:COLOR.green};
+  // Détecte si un vol en cours est un décollage
+  let isTakeoff = false;
+
+  if (LAST_FIDS && LAST_FIDS.departures) {
+    // On vérifie si un vol programmé a la piste 04
+    isTakeoff = LAST_FIDS.departures.some(v => (v.runway || "").includes("04"));
+  }
+
+  SONO_MARKERS.forEach(s => {
+    let style = {color: COLOR.gray, fillColor: COLOR.gray};
+
+    // 🔴 F017 rouge UNIQUEMENT si (piste 04 + décollage)
+    if (rwy === "04" && isTakeoff && s.id === "F017") {
+      style = {color: COLOR.red, fillColor: COLOR.red};
     }
-    s.marker.setStyle({...style,fillOpacity:1});
+    else if (rwy === "22") {
+      if (RW22_TKOFF_GREEN.has(s.id))
+        style = {color: COLOR.green, fillColor: COLOR.green};
+    }
+    else if (rwy === "04") {
+      if (RW04_LDG_IMP_RED.has(s.id))
+        style = {color: COLOR.red, fillColor: COLOR.red};
+      else if (RW04_LDG_GREEN.has(s.id) || RW04_BOTH_GREEN.has(s.id))
+        style = {color: COLOR.green, fillColor: COLOR.green};
+    }
+
+    s.marker.setStyle({...style, fillOpacity:1});
   });
 }
 function computeImpacted(h){
@@ -625,6 +642,7 @@ setInterval(refresh,60_000);
 
 </body>
 </html>
+
 
 
 
