@@ -114,9 +114,9 @@ let FLT_FILTER = "ALL";
 let lastHeading = null;
 let lastRunway = null;
 
-// -----------------------------
-// HELPERS FIDS ↔ ADS-B
-// -----------------------------
+/* ================================
+   HELPERS FIDS ↔ ADS-B
+================================ */
 function normalizeCallsign(cs) {
   if (!cs) return "";
   return String(cs).toUpperCase().trim().replace(/\s+/g,"").replace(/[^A-Z0-9]/g,"").slice(0,8);
@@ -150,7 +150,7 @@ const SONOS = [
 const COLOR = { green:"#10b981", red:"#ef4444", gray:"#6b7280" };
 const RW22_TKOFF_GREEN = new Set(["F002","F003","F004","F005","F006","F007","F008","F009","F010","F011","F012","F013","F016"]);
 const RW04_LDG_GREEN   = new Set(["F002","F003","F007","F008","F009","F011","F013"]);
-const RW04_BOTH_GREEN  = new Set(["F001","F014","F015","F017"]);
+const RW04_BOTH_GREEN  = new Set(["F001","F014","F015","F017"]); // F017 sera surchargé à chaud
 const RW04_LDG_IMP_RED = new Set(["F004","F005","F006","F010","F012","F016"]);
 
 /* ================================
@@ -175,6 +175,89 @@ const SONO_MARKERS = SONOS.map(s=>{
   `);
   return {...s, marker};
 });
+
+/* ================================
+   UTILITAIRES GÉO
+================================ */
+function toRad(d){ return d*Math.PI/180; }
+function toDeg(r){ return r*180/Math.PI; }
+
+function computePoint([lat,lon],heading,km){
+  const R=6371;
+  const d=km/R;
+  const br=toRad(heading);
+  const la=toRad(lat), lo=toRad(lon);
+  const la2=Math.asin(Math.sin(la)*Math.cos(d)+Math.cos(la)*Math.sin(d)*Math.cos(br));
+  const lo2=lo+Math.atan2(Math.sin(br)*Math.sin(d)*Math.cos(la),Math.cos(d)-Math.sin(la)*Math.sin(la2));
+  return [toDeg(la2),toDeg(lo2)];
+}
+
+function distanceKm(lat1,lon1,lat2,lon2){
+  const R=6371, dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// distance point → segment (km)
+function distancePointToSegmentKm(p, a, b){
+  // convert to planar approx using lat/long degrees to km near EBLG
+  const kx = 111*Math.cos(toRad((a[0]+b[0])/2)); // km per degree lon
+  const ky = 111;                                 // km per degree lat
+  const px=(p[1]-a[1])*kx, py=(p[0]-a[0])*ky;
+  const bx=(b[1]-a[1])*kx, by=(b[0]-a[0])*ky;
+  const t=Math.max(0,Math.min(1, (px*bx+py*by)/(bx*bx+by*by || 1)));
+  const qx = t*bx, qy = t*by;
+  const dx = px-qx, dy = py-qy;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+// point-in-polygon exact (ray casting)
+function pointInPolygon(point, polygon){
+  const [lat,lon]=point;
+  let inside=false;
+  for (let i=0,j=polygon.length-1;i<polygon.length;j=i++){
+    const [lati,loni]=polygon[i], [latj,lonj]=polygon[j];
+    const intersect = ((loni>lon)!=(lonj>lon)) &&
+      (lat < (latj-lati)*(lon-loni)/(lonj-loni+1e-12)+lati);
+    if (intersect) inside=!inside;
+  }
+  return inside;
+}
+
+/* ================================
+   RUNWAY 04 – GEOMETRIE RÉELLE
+================================ */
+// Approximations réalistes des seuils de piste (ajuste si besoin)
+const RWY04_START = [50.637950, 5.443800]; // seuil piste 04 (proche aerodrome ref)
+const RWY04_END   = [50.643600, 5.452000]; // extrémité piste 04
+const RWY04_HEADING = 40;
+
+// largeur piste ~ 60 m → 0.06 km (demi-largeur = 0.03 km)
+const RWY_HALF_WIDTH_KM = 0.03;
+
+// Polygone piste étroit aligné
+const RWY04_POLY = [
+  computePoint(RWY04_START, RWY04_HEADING - 90, RWY_HALF_WIDTH_KM),
+  computePoint(RWY04_END,   RWY04_HEADING - 90, RWY_HALF_WIDTH_KM),
+  computePoint(RWY04_END,   RWY04_HEADING + 90, RWY_HALF_WIDTH_KM),
+  computePoint(RWY04_START, RWY04_HEADING + 90, RWY_HALF_WIDTH_KM)
+];
+
+// (Optionnel) visualiser la piste
+// L.polygon(RWY04_POLY, {color:'#666', weight:1}).addTo(map);
+
+// zone prolongée (couloir) pour montée initiale : bande ±0.5 km autour de l’axe jusqu’à 6 km
+function buildExtendedCenterlinePoly(start, end, halfWidthKm, lengthKm){
+  const axisHeading = RWY04_HEADING;
+  const axisEnd = computePoint(start, axisHeading, lengthKm);
+  const leftStart  = computePoint(start, axisHeading-90, halfWidthKm);
+  const rightStart = computePoint(start, axisHeading+90, halfWidthKm);
+  const leftEnd    = computePoint(axisEnd, axisHeading-90, halfWidthKm);
+  const rightEnd   = computePoint(axisEnd, axisHeading+90, halfWidthKm);
+  return [leftStart,leftEnd,rightEnd,rightStart];
+}
+const RWY04_EXT_POLY = buildExtendedCenterlinePoly(RWY04_END, RWY04_START, 0.5, 6);
+
 /* ================================
    ADS‑B – OpenSky (index par callsign)
 ================================ */
@@ -230,7 +313,14 @@ function updateADSB(states){
     }
   });
 
-  // Après rafraîchissement ADS-B, on met à jour les badges dans la liste FIDS
+  // Détection décollage RWY 04 + VR + survol F017
+  detectTakeoff04(states);
+
+  // MAJ couleurs sonos immédiatement (sans attendre le prochain refresh())
+  if (lastRunway) colorSonoByRunway(lastRunway);
+  updateF017Icon();
+
+  // Après rafraîchissement ADS‑B, on met à jour les badges dans la liste FIDS
   annotateFlightsWithADSB();
 }
 
@@ -386,15 +476,6 @@ function runwayFromMetar(m){
   });
   return best;
 }
-function computePoint([lat,lon],heading,km){
-  const R=6371;
-  const d=km/R;
-  const br=heading*Math.PI/180;
-  const la=lat*Math.PI/180, lo=lon*Math.PI/180;
-  const la2=Math.asin(Math.sin(la)*Math.cos(d)+Math.cos(la)*Math.sin(d)*Math.cos(br));
-  const lo2=lo+Math.atan2(Math.sin(br)*Math.sin(d)*Math.cos(la),Math.cos(d)-Math.sin(la)*Math.sin(la2));
-  return [la2*180/Math.PI,lo2*180/Math.PI];
-}
 function buildCorridor(h){
   const start=[EBLG.lat,EBLG.lon];
   const end=computePoint(start,h,20);
@@ -405,33 +486,21 @@ function buildCorridor(h){
   return [leftStart,leftEnd,rightEnd,rightStart];
 }
 function colorSonoByRunway(rwy){
-  // Détecte si un vol en cours est un décollage
-  let isTakeoff = false;
+  SONO_MARKERS.forEach(s=>{
+    let style={color:COLOR.gray,fillColor:COLOR.gray};
 
-  if (LAST_FIDS && LAST_FIDS.departures) {
-    // On vérifie si un vol programmé a la piste 04
-    isTakeoff = LAST_FIDS.departures.some(v => (v.runway || "").includes("04"));
-  }
-
-  SONO_MARKERS.forEach(s => {
-    let style = {color: COLOR.gray, fillColor: COLOR.gray};
-
-    // 🔴 F017 rouge UNIQUEMENT si (piste 04 + décollage)
-    if (rwy === "04" && isTakeoff && s.id === "F017") {
-      style = {color: COLOR.red, fillColor: COLOR.red};
+    // 🔴 F017 rouge UNIQUEMENT pendant le décollage réel RWY 04 (course + montée < 200 ft)
+    if (s.id === "F017" && IS_TAKEOFF_04) {
+      style={color:COLOR.red,fillColor:COLOR.red};
     }
-    else if (rwy === "22") {
-      if (RW22_TKOFF_GREEN.has(s.id))
-        style = {color: COLOR.green, fillColor: COLOR.green};
-    }
-    else if (rwy === "04") {
-      if (RW04_LDG_IMP_RED.has(s.id))
-        style = {color: COLOR.red, fillColor: COLOR.red};
+    else if (rwy==="22"){
+      if (RW22_TKOFF_GREEN.has(s.id)) style={color:COLOR.green,fillColor:COLOR.green};
+    } else if (rwy==="04"){
+      if (RW04_LDG_IMP_RED.has(s.id)) style={color:COLOR.red,fillColor:COLOR.red};
       else if (RW04_LDG_GREEN.has(s.id) || RW04_BOTH_GREEN.has(s.id))
-        style = {color: COLOR.green, fillColor: COLOR.green};
+        style={color:COLOR.green,fillColor:COLOR.green};
     }
-
-    s.marker.setStyle({...style, fillOpacity:1});
+    s.marker.setStyle({...style,fillOpacity:1});
   });
 }
 function computeImpacted(h){
@@ -451,7 +520,9 @@ function updateHeatmap(imp){
     return [s.lat,s.lon,isImp?1.5:0.3];
   });
   if (heatLayer) map.removeLayer(heatLayer);
-  heatLayer = L.heatLayer(pts,{radius:40,blur:25,maxZoom:12}).addTo(map);
+  if (window.L && L.heatLayer) {
+    heatLayer = L.heatLayer(pts,{radius:40,blur:25,maxZoom:12}).addTo(map);
+  }
 }
 
 /* ================================
@@ -555,7 +626,8 @@ function updateHistoryChart(fId){
     CHARTS[fId].update();
   }
 }
-  /* ================================
+
+/* ================================
    ALERTES
 ================================ */
 function computeAlerts(m,rw){
@@ -575,29 +647,216 @@ function computeAlerts(m,rw){
 }
 
 /* ================================
-   MAIN LOOP
+   DÉTECTION ADS-B DÉCOLLAGE RWY 04
 ================================ */
-function showFlightDetail(v){
-  document.getElementById("flight-detail").innerHTML = `
-    <strong>${v.flightPax}</strong> – ${v.aircraftType}<br>
-    ${v.origin} → ${v.destination}<br>
-    Piste : ${v.runway||"-"}<br>
-    STD/STA : ${formatLocal(v.sTx)}<br>
-    ETD/ETA : ${formatLocal(v.eTx)}<br>
-    ATD/ATA : ${formatLocal(v.aTx)}<br>
-    Stand : ${v.stand||"-"}<br>
-    Opérateur : ${v.operator||"-"}
-  `;
-}
-function highlightFlightOnMap(v){
-  if(!v) return;
-  const pos=[EBLG.lat+0.005,EBLG.lon+0.005];
-  if (window.flightMarker) map.removeLayer(window.flightMarker);
-  window.flightMarker = L.circleMarker(pos,{radius:10,color:"#f97316",fillColor:"#f97316",fillOpacity:0.9})
-    .addTo(map).bindPopup(`Vol ${v.flightPax}`);
-  map.setView(pos,13);
+// conversions
+const MS2KT = 1.943844;
+const M2FT  = 3.28084;
+
+// Seuils (réglables)
+const RWY04_HEADING_TOL = 15;      // ±15°
+const ROLL_GS_KT        = 70;      // vitesse typique course
+const FAST_TAXI_KT      = 40;      // roulage rapide
+const VR_GS_KT          = 110;     // proche VR (indicatif)
+const CLIMB_MAX_ALT_FT  = 200;     // montée initiale jusqu'à 200 ft
+const CENTERLINE_MAX_OFFSET_KM = 0.5; // demi-largeur du couloir prolongé
+
+let IS_TAKEOFF_04 = false;
+let lastTakeoffTime = 0;
+
+let VR_DETECTED = false;
+let VR_LOCATION = null;
+let VR_MARKER = null;
+
+// icône ✈️⬆️ au-dessus de F017 pendant le décollage
+const TAKEOFF_ICON = L.divIcon({
+  html: "✈️⬆️",
+  className: "takeoff-icon",
+  iconSize: [30, 30],
+  iconAnchor: [15, 15]
+});
+// injecter style minimal
+(function addIconStyle(){
+  const st = document.createElement('style');
+  st.textContent = `.takeoff-icon{font-size:28px;color:#dc2626;text-shadow:0 0 4px rgba(0,0,0,.6);}`;
+  document.head.appendChild(st);
+})();
+let f017MarkerAbove = null;
+
+function showToast(msgText, bg="#dc2626"){
+  const msg = document.createElement("div");
+  msg.style.position = "fixed";
+  msg.style.top = "20px";
+  msg.style.right = "20px";
+  msg.style.background = bg;
+  msg.style.color = "white";
+  msg.style.padding = "12px 18px";
+  msg.style.borderRadius = "6px";
+  msg.style.fontSize = "16px";
+  msg.style.boxShadow = "0 4px 10px rgba(0,0,0,0.3)";
+  msg.style.zIndex = 99999;
+  msg.style.opacity = "0";
+  msg.style.transition = "opacity .2s";
+  msg.textContent = msgText;
+  document.body.appendChild(msg);
+  requestAnimationFrame(()=>{ msg.style.opacity="1"; });
+  setTimeout(() => {
+    msg.style.opacity = "0";
+    setTimeout(() => msg.remove(), 600);
+  }, 3500);
 }
 
+function showTakeoffNotification(cs){
+  showToast(`Décollage RWY 04 détecté : ${cs}`, "#dc2626");
+}
+
+function updateF017Icon(){
+  const f017 = SONOS.find(s => s.id === "F017");
+  if (!f017) return;
+  if (IS_TAKEOFF_04) {
+    if (!f017MarkerAbove) {
+      f017MarkerAbove = L.marker([f017.lat, f017.lon], {icon: TAKEOFF_ICON}).addTo(map);
+    }
+  } else {
+    if (f017MarkerAbove) {
+      map.removeLayer(f017MarkerAbove);
+      f017MarkerAbove = null;
+    }
+  }
+}
+
+// Survol F017 – durée exacte
+let F017_SURVEY_START = null;
+let F017_SURVEY_ACTIVE = false;
+function checkF017Overflight(lat, lon){
+  const f017 = SONOS.find(s => s.id === "F017");
+  if (!f017) return;
+  const dist = distanceKm(lat, lon, f017.lat, f017.lon); // km
+
+  // On ne mesure la durée que pendant le décollage / montée < 200 ft
+  if (!IS_TAKEOFF_04) {
+    if (F017_SURVEY_ACTIVE && F017_SURVEY_START){
+      const duration = ((Date.now()-F017_SURVEY_START)/1000).toFixed(1);
+      showToast(`Survol F017 terminé – durée ${duration} s`, "#0ea5e9");
+    }
+    F017_SURVEY_ACTIVE = false;
+    F017_SURVEY_START = null;
+    return;
+  }
+
+  if (dist < 0.5) {
+    if (!F017_SURVEY_ACTIVE) {
+      F017_SURVEY_ACTIVE = true;
+      F017_SURVEY_START = Date.now();
+      // console.log("Début survol F017");
+    }
+  } else {
+    if (F017_SURVEY_ACTIVE && F017_SURVEY_START){
+      const duration = ((Date.now()-F017_SURVEY_START)/1000).toFixed(1);
+      showToast(`Survol F017 terminé – durée ${duration} s`, "#0ea5e9");
+      F017_SURVEY_ACTIVE = false;
+      F017_SURVEY_START = null;
+    }
+  }
+}
+
+function angleDiff(a,b){
+  let d = Math.abs(a-b) % 360;
+  if (d>180) d=360-d;
+  return d;
+}
+
+function detectTakeoff04(states){
+  let detected = false;
+
+  for (const s of states) {
+    const callsign = (s[1] || "").trim();
+    const lon = s[5];
+    const lat = s[6];
+    if (lat == null || lon == null) continue;
+
+    const velocity_mps = s[9] || 0;
+    const track = (s[10] != null) ? s[10] : null;
+    const vrate_mps = (s[11] != null) ? s[11] : null;
+
+    const alt_m = (s[13] != null) ? s[13] : ((s[7] != null) ? s[7] : 0);
+    const gs = velocity_mps * MS2KT;
+    const alt_ft = (alt_m || 0) * M2FT;
+
+    // Ne considérer que des DEPARTURES RWY 04 connus FIDS
+    const norm = normalizeCallsign(callsign);
+    let fidsFlight = null;
+    if (LAST_FIDS && LAST_FIDS.departures) {
+      fidsFlight = LAST_FIDS.departures.find(v =>
+        normalizeCallsign(v.flightPax || v.flight || v.callsign) === norm
+      );
+    }
+    if (!fidsFlight) continue;
+    if (!((fidsFlight.runway || "").includes("04"))) continue;
+
+    // Avion "sur la piste" = dans polygone étroit de piste
+    const onRunway = pointInPolygon([lat,lon], RWY04_POLY);
+
+    // Heading proche 040°
+    const goodHeading = (track != null) ? (angleDiff(track, RWY04_HEADING) <= RWY04_HEADING_TOL) : true;
+
+    // Proximité de l'axe prolongé (pendant montée)
+    const axisOffsetKm = distancePointToSegmentKm([lat,lon], RWY04_START, RWY04_END);
+    const nearCenterline = axisOffsetKm <= CENTERLINE_MAX_OFFSET_KM;
+    const alongRunwayDir = goodHeading; // simple
+
+    // Phases
+    const fastTaxi    = gs >= FAST_TAXI_KT;
+    const takeoffRoll = onRunway && goodHeading && gs >= ROLL_GS_KT;
+    const initialClimb = !onRunway && alongRunwayDir && (gs >= ROLL_GS_KT) && (alt_ft > 0 && alt_ft <= CLIMB_MAX_ALT_FT) && nearCenterline;
+
+    // Détection VR (une fois)
+    if (!VR_DETECTED && onRunway && goodHeading && gs >= VR_GS_KT && (alt_ft < 50 || (vrate_mps != null && vrate_mps > 0.5))){
+      VR_DETECTED = true;
+      VR_LOCATION = [lat,lon];
+      if (VR_MARKER) map.removeLayer(VR_MARKER);
+      VR_MARKER = L.circleMarker(VR_LOCATION, {
+        radius:8, color:"#22d3ee", fillColor:"#22d3ee", fillOpacity:0.9
+      }).addTo(map).bindPopup("Rotation Point (VR)");
+    }
+
+    if (takeoffRoll || initialClimb){
+      detected = true;
+
+      if (!IS_TAKEOFF_04) {
+        // Première détection → notification
+        showTakeoffNotification(callsign || "—");
+      }
+
+      IS_TAKEOFF_04 = true;
+      lastTakeoffTime = Date.now();
+
+      // Mesure du survol de F017 (uniquement pendant la phase)
+      checkF017Overflight(lat, lon);
+
+      // pas besoin d'examiner d'autres avions si un seul suffit
+      // (mais on continue si on veut suivre plusieurs décollages simultanés)
+    }
+  }
+
+  // Hystérésis : si pause ADS‑B, conserver 20 s avant extinction
+  if (!detected && IS_TAKEOFF_04) {
+    if (Date.now() - lastTakeoffTime > 20000) {
+      IS_TAKEOFF_04 = false;
+      // fin du survol si resté actif
+      if (F017_SURVEY_ACTIVE && F017_SURVEY_START){
+        const duration = ((Date.now()-F017_SURVEY_START)/1000).toFixed(1);
+        showToast(`Survol F017 terminé – durée ${duration} s`, "#0ea5e9");
+      }
+      F017_SURVEY_ACTIVE = false;
+      F017_SURVEY_START = null;
+    }
+  }
+}
+
+/* ================================
+   MAIN LOOP
+================================ */
 async function refresh(){
   const metar = await fetchMetar();
   updateMetarUI(metar);
@@ -618,10 +877,12 @@ async function refresh(){
     const step=(rw.heading-lastHeading)*0.1;
     lastHeading+=step;
 
+    // Couleur sonos (intègre F017 rouge si IS_TAKEOFF_04)
     colorSonoByRunway(rw.name);
 
+    // Corridor + Heatmap (optionnel)
     const impacted=computeImpacted(lastHeading);
-    // updateHeatmap(impacted); // Désactivé
+    updateHeatmap(impacted);
 
     document.getElementById("sonos-impacted").innerHTML =
       impacted.length
@@ -631,17 +892,24 @@ async function refresh(){
     computeAlerts(metar,rw);
   }
 
+  // ADS-B après tout (met à jour IS_TAKEOFF_04, VR, icône, etc.)
   const adsb = await fetchADSB();
   updateADSB(adsb);
+
+  // Icône F017 en dernier (sécurité)
+  updateF017Icon();
 }
+
 let corridorLayer=null, heatLayer=null;
-  // Démarrage
+
+// Démarrage
 refresh();
 setInterval(refresh,60_000);
 </script>
 
 </body>
 </html>
+
 
 
 
