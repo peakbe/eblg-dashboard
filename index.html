@@ -604,7 +604,7 @@ async function refresh(){
     colorSonoByRunway(rw.name);
 
     const impacted=computeImpacted(lastHeading);
-    updateHeatmap(impacted); // Désactivé
+    // updateHeatmap(impacted); // Désactivé
 
     document.getElementById("sonos-impacted").innerHTML =
       impacted.length
@@ -625,6 +625,7 @@ setInterval(refresh,60_000);
 
 </body>
 </html>
+
 
 
 
