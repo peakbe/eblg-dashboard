@@ -882,7 +882,7 @@ async function refresh(){
 
     // Corridor + Heatmap (optionnel)
     const impacted=computeImpacted(lastHeading);
-    updateHeatmap(impacted);
+    // updateHeatmap(impacted); // Désactivé
 
     document.getElementById("sonos-impacted").innerHTML =
       impacted.length
@@ -909,6 +909,7 @@ setInterval(refresh,60_000);
 
 </body>
 </html>
+
 
 
 
