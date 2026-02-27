@@ -246,6 +246,18 @@ let corridorLayer=null,heatLayer=null;
    ICÔNES AVION
 ============================================================ */
 const HEAD_TOL=15;
+  
+const AIRCRAFT_ICON = (track, color) => L.divIcon({
+  html: `
+    <svg width="32" height="32" viewBox="0 0 24 24"
+         style="transform: rotate(${track}deg);">
+      <path fill="${color}" d="M2.5 19l8.5-7-8.5-7v5l6 2-6 2zM11 22l4-20h-2l-4 20h2zm5.5-3l6-2-6-2 6-2V5l-8.5 7 8.5 7v-5z"/>
+    </svg>
+  `,
+  className: "aircraft-icon",
+  iconSize: [32, 32],
+  iconAnchor: [16, 16]
+});
 
 const PLANE_DEP=t=>L.divIcon({
   html:`<svg width="28" height="28" viewBox="0 0 24 24" style="transform:rotate(${t}deg)"><path fill="#f97316" d="M2.5 19l8.5-7-8.5-7v5l6 2-6 2zM11 22l4-20h-2l-4 20h2zm5.5-3l6-2-6-2 6-2V5l-8.5 7 8.5 7v-5z"/></svg>`,
@@ -299,26 +311,31 @@ function normalizeCallsign(t){
   return t?String(t).toUpperCase().trim().replace(/\s+/g,"").replace(/[^A-Z0-9]/g,"").slice(0,8):"";
 }
 
-function planeIconFor(callsign,track){
-  const n=normalizeCallsign(callsign||"");
-  let kind=null;
+function planeIconFor(callsign, track) {
+  const n = normalizeCallsign(callsign || "");
+  let kind = null;
 
-  if(LAST_FIDS){
-    const arr=(LAST_FIDS.arrivals||[]).find(v=>normalizeCallsign(v.flightPax||v.flight||v.callsign)===n);
-    const dep=(LAST_FIDS.departures||[]).find(v=>normalizeCallsign(v.flightPax||v.flight||v.callsign)===n);
-    if(dep) kind="DEP"; else if(arr) kind="ARR";
+  if (LAST_FIDS) {
+    const arr = (LAST_FIDS.arrivals || []).find(v => normalizeCallsign(v.flightPax || v.flight || v.callsign) === n);
+    const dep = (LAST_FIDS.departures || []).find(v => normalizeCallsign(v.flightPax || v.flight || v.callsign) === n);
+    if (dep) kind = "DEP";
+    else if (arr) kind = "ARR";
   }
 
-  if(!kind){
-    if(track!=null){
-      const d04=Math.min(Math.abs(track-40),360-Math.abs(track-40));
-      const d22=Math.min(Math.abs(track-220),360-Math.abs(track-220));
-      kind=(d04<=HEAD_TOL||d22<=HEAD_TOL)?"DEP":"ARR";
-    } else kind="ARR";
+  if (!kind) {
+    if (track != null) {
+      const d04 = Math.min(Math.abs(track - 40), 360 - Math.abs(track - 40));
+      const d22 = Math.min(Math.abs(track - 220), 360 - Math.abs(track - 220));
+      kind = (d04 <= HEAD_TOL || d22 <= HEAD_TOL) ? "DEP" : "ARR";
+    } else {
+      kind = "ARR";
+    }
   }
 
-  return kind==="DEP" ? PLANE_DEP(track||0) : PLANE_ARR(track||0);
+  const color = kind === "DEP" ? "#f97316" : "#2563eb";
+  return AIRCRAFT_ICON(track || 0, color);
 }
+
 
 /* ============================================================
    ADS‑B
@@ -1061,4 +1078,5 @@ setInterval(refresh,60_000);
 </script>
 
 </body
+
 
