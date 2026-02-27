@@ -157,7 +157,7 @@ const COLOR={green:"#10b981",red:"#ef4444",gray:"#6b7280"};
 const map=L.map("map").setView([EBLG.lat,EBLG.lon],11);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-L.circleMarker([EBLG.lat,EBLG.lon],{radius:7,color:"#10b981",fillColor:"#10b981",fillOpacity:1})
+L.circleMarker([EBLG.lat,EBLG.lon],{radius:7,color:"#FFFFFF",fillColor:"#2563eb",fillOpacity:1})
   .addTo(map).bindPopup("EBLG – Liège Airport");
 
 const SONO_MARKERS=SONOS.map(s=>{
@@ -1025,6 +1025,18 @@ async function refresh(){
     if(lastHeading==null) lastHeading=rw.heading;
     lastHeading+=(rw.heading-lastHeading)*.1;
 
+    // Corridor bruit (selon heading)
+if (CORRIDOR_ENABLED) {
+  const poly = buildCorridor(lastHeading);
+  if (corridorLayer) map.removeLayer(corridorLayer);
+  corridorLayer = L.polygon(poly, {
+    color: "#f97316",
+    weight: 2,
+    fillColor: "rgba(249,115,22,0.15)",
+    fillOpacity: 0.3
+  }).addTo(map);
+}
+
     updateSonoColors(rw.name,"ARR");
 
     const impacted=computeImpacted(lastHeading);
@@ -1049,3 +1061,4 @@ setInterval(refresh,60_000);
 </script>
 
 </body
+
